@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Festa Junina</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #fff3e0; }
+        .btn-orange { background-color: #e65100; color: white; }
+        .btn-orange:hover { background-color: #bf360c; }
+        .text-orange { color: #e65100; }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="tela-login" class="w-full max-w-sm bg-white rounded-xl shadow-lg p-6 text-center border-t-4 border-orange-600">
+        <h1 class="text-2xl font-black text-orange mb-2">Caixa / Retirada</h1>
+        <p class="text-gray-500 mb-6 text-sm">Acesso para validar as fichas.</p>
+        
+        <input type="password" id="input-senha" placeholder="Senha Administrativa" class="w-full border-2 border-gray-300 p-3 rounded-lg mb-4 text-center text-lg focus:outline-none focus:border-orange-500 transition">
+        
+        <button id="btn-entrar" class="w-full btn-orange font-bold py-3 rounded-lg transition duration-300 flex justify-center items-center">
+            Acessar Câmera
+        </button>
+        <p id="msg-erro" class="text-red-500 mt-3 font-medium hidden">Senha incorreta.</p>
+    </div>
+
+    <div id="tela-scanner" class="w-full max-w-lg bg-white rounded-xl shadow-lg p-6 text-center hidden">
+        <div class="flex justify-between items-center mb-4 border-b pb-3">
+            <h1 class="text-xl font-bold text-orange">Leitor de Fichas</h1>
+            <button id="btn-sair" class="text-gray-500 font-bold hover:bg-gray-100 p-2 rounded-lg">Sair</button>
+        </div>
+        
+        <div id="qr-reader" class="w-full mx-auto border-2 border-dashed border-orange-300 rounded-lg overflow-hidden mb-4 bg-gray-50"></div>
+
+        <div id="resultado" class="min-h-[80px] flex items-center justify-center text-lg font-medium p-3 rounded-lg bg-orange-50 text-gray-700">
+            Aponte a câmera para o QR Code do Voucher...
+        </div>
+    </div>
+
+    <script>
+        // Substitua pelo URL do seu Executável (Web App)
+        const URL_GOOGLE_SCRIPT = "COLE_AQUI_O_LINK_DO_SEU_WEB_APP_QUE_TERMINA_COM_/exec"; 
+        
+        const telaLogin = document.getElementById('tela-login');
+        const telaScanner = document.getElementById('tela-scanner');
+        const inputSenha = document.getElementById('input-senha');
+        const btnEntrar = document.getElementById('btn-entrar');
+        const btnSair = document.getElementById('btn-sair');
+        const msgErro = document.getElementById('msg-erro');
+        const divResultado = document.getElementById('resultado');
+        
+        let html5QrcodeScanner = null;
+        let lastScannedCode = null;
+        let isScanning = false;
+        let senhaValidadaEmMemoria = ""; 
+
+        btnEntrar.addEventListener('click', logar);
+        inputSenha.addEventListener('keypress', (e) => { if (e.key === 'Enter') logar(); });
+
+        function logar() {
+            const senhaDigitada = inputSenha.value.trim();
+            if (!senhaDigitada) return;
+
+            btnEntrar.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 border-white border-t-2 border-b-2 rounded-full" viewBox="0 0 24 24"></svg> Validando...`;
+            btnEntrar.disabled = true;
+
+            const urlCompleta = `${URL_GOOGLE_SCRIPT}?action=login&senha=${encodeURIComponent(senhaDigitada)}`;
+
+            fetch(urlCompleta)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        senhaValidadaEmMemoria = senhaDigitada;
+                        telaLogin.classList.add('hidden');
+                        telaScanner.classList.remove('hidden');
+                        iniciarScanner();
+                    } else {
+                        msgErro.innerText = data.message || "Senha incorreta.";
+                        msgErro.classList.remove('hidden');
+                        setTimeout(() => msgErro.classList.add('hidden'), 3000);
+                    }
+                })
+                .catch(error => {
+                    msgErro.innerText = "Erro ao conectar.";
+                    msgErro.classList.remove('hidden');
+                    setTimeout(() => msgErro.classList.add('hidden'), 3000);
+                })
+                .finally(() => {
+                    btnEntrar.innerHTML = "Acessar Câmera"; btnEntrar.disabled = false; inputSenha.value = '';
+                });
+        }
+
+        btnSair.addEventListener('click', () => {
+            if (html5QrcodeScanner) html5QrcodeScanner.clear().catch(e => console.error(e));
+            senhaValidadaEmMemoria = ""; 
+            telaScanner.classList.add('hidden'); telaLogin.classList.remove('hidden');
+        });
+
+        function iniciarScanner() {
+            html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { 
+                fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0, showTorchButtonIfSupported: true
+            }, false);
+            html5QrcodeScanner.render(onScanSuccess, () => {});
+        }
+
+        function onScanSuccess(decodedText) {
+            if (decodedText !== lastScannedCode && !isScanning) {
+                lastScannedCode = decodedText;
+                isScanning = true;
+                
+                divResultado.innerHTML = `<span class="text-blue-600 animate-pulse">Consultando o servidor...</span>`;
+                html5QrcodeScanner.pause(true);
+
+                const urlCompleta = `${URL_GOOGLE_SCRIPT}?action=registrarEntrega&idUnico=${encodeURIComponent(decodedText)}&senha=${encodeURIComponent(senhaValidadaEmMemoria)}`;
+                
+                fetch(urlCompleta)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            divResultado.innerHTML = `<span class="text-green-700 font-black text-xl">✅ ${data.message}</span>`;
+                        } else {
+                            divResultado.innerHTML = `<span class="text-red-600 font-bold">❌ ${data.message}</span>`;
+                        }
+                    })
+                    .catch(error => { divResultado.innerHTML = `<span class="text-red-600 font-bold">Erro de conexão.</span>`; })
+                    .finally(() => {
+                        setTimeout(() => {
+                            divResultado.innerHTML = "Aponte a câmera para o próximo QR Code...";
+                            lastScannedCode = null; isScanning = false; html5QrcodeScanner.resume();
+                        }, 3000); // Libera a câmera após 3 segundos
+                    });
+            }
+        }
+    </script>
+</body>
+</html>
