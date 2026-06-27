@@ -15,6 +15,7 @@
 </head>
 <body class="flex flex-col items-center justify-center min-h-screen p-4">
 
+    <!-- Tela de Login -->
     <div id="tela-login" class="w-full max-w-sm bg-white rounded-xl shadow-lg p-6 text-center border-t-4 border-orange-600">
         <h1 class="text-2xl font-black text-orange mb-2">Caixa / Retirada</h1>
         <p class="text-gray-500 mb-6 text-sm">Acesso para validar as fichas.</p>
@@ -27,6 +28,7 @@
         <p id="msg-erro" class="text-red-500 mt-3 font-medium hidden">Senha incorreta.</p>
     </div>
 
+    <!-- Tela do Scanner -->
     <div id="tela-scanner" class="w-full max-w-lg bg-white rounded-xl shadow-lg p-6 text-center hidden">
         <div class="flex justify-between items-center mb-4 border-b pb-3">
             <h1 class="text-xl font-bold text-orange">Leitor de Fichas</h1>
@@ -35,8 +37,33 @@
         
         <div id="qr-reader" class="w-full mx-auto border-2 border-dashed border-orange-300 rounded-lg overflow-hidden mb-4 bg-gray-50"></div>
 
-        <div id="resultado" class="min-h-[80px] flex items-center justify-center text-lg font-medium p-3 rounded-lg bg-orange-50 text-gray-700">
+        <div id="resultado" class="min-h-[60px] flex items-center justify-center text-lg font-medium p-3 rounded-lg bg-orange-50 text-gray-700">
             Aponte a câmera para o QR Code do Voucher...
+        </div>
+    </div>
+
+    <!-- MODAL DE RESULTADO (POP-UP) -->
+    <div id="modal-resultado" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 px-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden transform transition-all">
+            
+            <!-- Cabeçalho do Modal -->
+            <div class="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-lg font-black text-gray-800" id="modal-titulo">Processando...</h3>
+                <button id="btn-fechar-modal" class="text-gray-400 hover:text-red-600 text-3xl leading-none font-bold outline-none transition-colors">&times;</button>
+            </div>
+            
+            <!-- Corpo do Modal -->
+            <div class="p-6 text-center min-h-[160px] flex flex-col justify-center items-center" id="modal-conteudo">
+                <!-- Conteúdo Dinâmico (Ícones e Mensagens) -->
+            </div>
+            
+            <!-- Rodapé do Modal -->
+            <div class="bg-gray-50 px-4 py-4 border-t border-gray-200 text-center">
+                <button id="btn-ok-modal" class="w-full btn-orange font-bold py-3 rounded-lg transition duration-300">
+                    Ler Próxima Ficha
+                </button>
+            </div>
+            
         </div>
     </div>
 
@@ -50,13 +77,20 @@
         const btnEntrar = document.getElementById('btn-entrar');
         const btnSair = document.getElementById('btn-sair');
         const msgErro = document.getElementById('msg-erro');
+        
         const divResultado = document.getElementById('resultado');
+        const modalResultado = document.getElementById('modal-resultado');
+        const modalTitulo = document.getElementById('modal-titulo');
+        const modalConteudo = document.getElementById('modal-conteudo');
+        const btnFecharModal = document.getElementById('btn-fechar-modal');
+        const btnOkModal = document.getElementById('btn-ok-modal');
         
         let html5QrcodeScanner = null;
         let lastScannedCode = null;
         let isScanning = false;
         let senhaValidadaEmMemoria = ""; 
 
+        // === LÓGICA DE LOGIN ===
         btnEntrar.addEventListener('click', logar);
         inputSenha.addEventListener('keypress', (e) => { if (e.key === 'Enter') logar(); });
 
@@ -99,6 +133,23 @@
             telaScanner.classList.add('hidden'); telaLogin.classList.remove('hidden');
         });
 
+        // === LÓGICA DE FECHAR MODAL E RETOMAR SCANNER ===
+        function fecharModalERetomar() {
+            modalResultado.classList.add('hidden');
+            divResultado.innerHTML = "Aponte a câmera para o próximo QR Code...";
+            
+            // Libera as variáveis para permitir uma nova leitura
+            lastScannedCode = null; 
+            isScanning = false; 
+            
+            // Despausa a câmera
+            if(html5QrcodeScanner) html5QrcodeScanner.resume();
+        }
+
+        btnFecharModal.addEventListener('click', fecharModalERetomar);
+        btnOkModal.addEventListener('click', fecharModalERetomar);
+
+        // === LÓGICA DO SCANNER ===
         function iniciarScanner() {
             html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { 
                 fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0, showTorchButtonIfSupported: true
@@ -107,31 +158,61 @@
         }
 
         function onScanSuccess(decodedText) {
+            // Evita leitura duplicada e bloqueia novas leituras enquanto processa
             if (decodedText !== lastScannedCode && !isScanning) {
                 lastScannedCode = decodedText;
                 isScanning = true;
                 
-                divResultado.innerHTML = `<span class="text-blue-600 animate-pulse">Consultando o servidor...</span>`;
+                // Pausa a câmera imediatamente
                 html5QrcodeScanner.pause(true);
+                divResultado.innerHTML = `<span class="text-blue-600 font-bold">Câmera pausada.</span>`;
 
+                // Abre o Modal em modo "Carregando"
+                modalTitulo.innerText = "Consultando Servidor";
+                modalConteudo.innerHTML = `
+                    <svg class="animate-spin h-12 w-12 text-orange-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="text-gray-600 font-bold text-lg">Aguarde...</p>
+                `;
+                modalResultado.classList.remove('hidden');
+
+                // Envia requisição para a Planilha
                 const urlCompleta = `${URL_GOOGLE_SCRIPT}?action=registrarEntrega&idUnico=${encodeURIComponent(decodedText)}&senha=${encodeURIComponent(senhaValidadaEmMemoria)}`;
                 
                 fetch(urlCompleta)
                     .then(response => response.json())
                     .then(data => {
+                        modalTitulo.innerText = "Resultado da Leitura";
                         if (data.success) {
-                            divResultado.innerHTML = `<span class="text-green-700 font-black text-xl">✅ ${data.message}</span>`;
+                            modalConteudo.innerHTML = `
+                                <div class="text-green-500 mb-3">
+                                    <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </div>
+                                <span class="text-green-700 font-black text-2xl block leading-tight">${data.message}</span>
+                            `;
                         } else {
-                            divResultado.innerHTML = `<span class="text-red-600 font-bold">❌ ${data.message}</span>`;
+                            modalConteudo.innerHTML = `
+                                <div class="text-red-500 mb-3">
+                                    <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                </div>
+                                <span class="text-red-600 font-bold block text-xl leading-tight">${data.message}</span>
+                            `;
                         }
                     })
-                    .catch(error => { divResultado.innerHTML = `<span class="text-red-600 font-bold">Erro de conexão.</span>`; })
-                    .finally(() => {
-                        setTimeout(() => {
-                            divResultado.innerHTML = "Aponte a câmera para o próximo QR Code...";
-                            lastScannedCode = null; isScanning = false; html5QrcodeScanner.resume();
-                        }, 3000); // Libera a câmera após 3 segundos
+                    .catch(error => { 
+                        modalTitulo.innerText = "Erro de Conexão";
+                        modalConteudo.innerHTML = `
+                            <div class="text-red-500 mb-3">
+                                <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <span class="text-red-600 font-bold block text-xl">Não foi possível conectar ao servidor.</span>
+                        `; 
                     });
+                
+                // O scanner não será retomado automaticamente. 
+                // A ação de retomada ocorrerá apenas quando o usuário clicar no "X" ou botão "Ler Próxima Ficha".
             }
         }
     </script>
