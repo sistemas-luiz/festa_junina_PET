@@ -1,220 +1,215 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Festa Junina</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <style>
-        body { font-family: sans-serif; background-color: #fff3e0; }
-        .btn-orange { background-color: #e65100; color: white; }
-        .btn-orange:hover { background-color: #bf360c; }
-        .text-orange { color: #e65100; }
-    </style>
+  <base target="_top">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Biblioteca HTML5-QRCode para leitura via câmera do celular ou webcam -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  
+  <style>
+    body {
+      background-color: #f4f6f9;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    .scanner-card {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    #reader {
+      width: 100%;
+      background: black;
+      border: none !important;
+    }
+    #reader__scan_region {
+      background: #000;
+    }
+    .result-box {
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      font-size: 1.1rem;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    .login-bg { 
+      background-color: #e65100; 
+      height: 100vh; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+    }
+    .login-card { 
+      width: 100%; 
+      max-width: 400px; 
+      padding: 2.5rem; 
+      border-radius: 20px; 
+      border: none; 
+      box-shadow: 0 15px 35px rgba(0,0,0,0.2); 
+      background: white; 
+    }
+  </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen p-4">
+<body>
 
-    <!-- Tela de Login -->
-    <div id="tela-login" class="w-full max-w-sm bg-white rounded-xl shadow-lg p-6 text-center border-t-4 border-orange-600">
-        <h1 class="text-2xl font-black text-orange mb-2">Caixa / Retirada</h1>
-        <p class="text-gray-500 mb-6 text-sm">Acesso para validar as fichas.</p>
+  <!-- TELA DE LOGIN -->
+  <div id="telaLogin" class="login-bg">
+    <div class="login-card text-center">
+        <h2 class="mb-2 fw-bold text-danger"><i class="bi bi-qr-code-scan text-warning"></i> Scanner</h2>
+        <p class="text-muted small mb-4">Leitor de Fichas Festa Junina</p>
         
-        <input type="password" id="input-senha" placeholder="Senha Administrativa" class="w-full border-2 border-gray-300 p-3 rounded-lg mb-4 text-center text-lg focus:outline-none focus:border-orange-500 transition">
-        
-        <button id="btn-entrar" class="w-full btn-orange font-bold py-3 rounded-lg transition duration-300 flex justify-center items-center">
-            Acessar Câmera
-        </button>
-        <p id="msg-erro" class="text-red-500 mt-3 font-medium hidden">Senha incorreta.</p>
-    </div>
-
-    <!-- Tela do Scanner -->
-    <div id="tela-scanner" class="w-full max-w-lg bg-white rounded-xl shadow-lg p-6 text-center hidden">
-        <div class="flex justify-between items-center mb-4 border-b pb-3">
-            <h1 class="text-xl font-bold text-orange">Leitor de Fichas</h1>
-            <button id="btn-sair" class="text-gray-500 font-bold hover:bg-gray-100 p-2 rounded-lg">Sair</button>
+        <div class="input-group mb-3">
+            <span class="input-group-text bg-light border-end-0"><i class="bi bi-key text-muted"></i></span>
+            <input type="password" id="senhaInput" class="form-control border-start-0 ps-0 bg-light" placeholder="Senha do Administrador" onkeypress="if(event.key === 'Enter') fazerLogin()">
         </div>
         
-        <div id="qr-reader" class="w-full mx-auto border-2 border-dashed border-orange-300 rounded-lg overflow-hidden mb-4 bg-gray-50"></div>
+        <button class="btn btn-warning text-dark w-100 fw-bold py-2 mb-2" onclick="fazerLogin()">Acessar Scanner</button>
+        <div id="erroLogin" class="text-danger small fw-bold" style="display: none;">Senha incorreta. Tente novamente!</div>
+    </div>
+  </div>
 
-        <div id="resultado" class="min-h-[60px] flex items-center justify-center text-lg font-medium p-3 rounded-lg bg-orange-50 text-gray-700">
-            Aponte a câmera para o QR Code do Voucher...
-        </div>
+  <!-- TELA DO SCANNER -->
+  <div id="telaScanner" class="container py-4" style="display: none; max-width: 600px;">
+    <div class="text-center mb-4">
+      <h3 class="fw-bold text-danger"><i class="bi bi-qr-code-scan"></i> Validador de Vouchers</h3>
+      <p class="text-muted">Aponte a câmera para o QR Code da ficha impressa ou digital</p>
     </div>
 
-    <!-- MODAL DE RESULTADO (POP-UP) -->
-    <div id="modal-resultado" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 px-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden transform transition-all">
-            
-            <!-- Cabeçalho do Modal -->
-            <div class="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-lg font-black text-gray-800" id="modal-titulo">Processando...</h3>
-                <button id="btn-fechar-modal" class="text-gray-400 hover:text-red-600 text-3xl leading-none font-bold outline-none transition-colors">&times;</button>
-            </div>
-            
-            <!-- Corpo do Modal -->
-            <div class="p-6 text-center min-h-[160px] flex flex-col justify-center items-center" id="modal-conteudo">
-                <!-- Conteúdo Dinâmico (Ícones e Mensagens) -->
-            </div>
-            
-            <!-- Rodapé do Modal -->
-            <div class="bg-gray-50 px-4 py-4 border-t border-gray-200 text-center">
-                <button id="btn-ok-modal" class="w-full btn-orange font-bold py-3 rounded-lg transition duration-300">
-                    Ler Próxima Ficha
-                </button>
-            </div>
-            
-        </div>
+    <div class="card scanner-card mb-4">
+      <div id="reader"></div>
     </div>
 
-    <script>
-        // Substitua pelo URL do seu Executável (Web App)
-        const URL_GOOGLE_SCRIPT = "https://script.google.com/macros/s/AKfycbysu1p_T3r5uiAIIPYnhxUgWlmkqvF9E7u7e3iGrUtmGBvKNfC4FukmKWqEa_ClyiNsow/exec"; 
+    <!-- BOX DE RESULTADOS E RETORNO -->
+    <div id="loadingScanner" class="text-center py-3" style="display: none;">
+      <div class="spinner-border text-warning" role="status"></div>
+      <p class="mt-2 text-muted fw-bold">Consultando banco de dados...</p>
+    </div>
+
+    <div id="resultadoValida" class="result-box d-none"></div>
+
+    <!-- BOTÕES DE CONTROLE -->
+    <div class="d-grid gap-2 mt-3">
+      <button id="btnReset" class="btn btn-outline-secondary d-none" onclick="reiniciarLeitor()">
+        <i class="bi bi-arrow-clockwise"></i> Escanear Próximo
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let html5QrcodeScanner = null;
+    let senhaValidada = "";
+
+    function fazerLogin() {
+      const senha = document.getElementById("senhaInput").value;
+      if (!senha) return;
+
+      document.getElementById("erroLogin").style.display = "none";
+      
+      // Valida efetuando uma chamada de teste no backend
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (data && data.error === "Acesso Negado") {
+            document.getElementById("erroLogin").style.display = "block";
+          } else {
+            senhaValidada = senha;
+            document.getElementById("telaLogin").style.display = "none";
+            document.getElementById("telaScanner").style.display = "block";
+            inicializarScanner();
+          }
+        })
+        .withFailureHandler(function() {
+          document.getElementById("erroLogin").innerText = "Erro ao conectar.";
+          document.getElementById("erroLogin").style.display = "block";
+        }).getDashboardData(senha);
+    }
+
+    function inicializarScanner() {
+      html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", 
+        { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          rememberLastUsedCamera: true
+        }
+      );
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+      // Pausa a leitura ao capturar um QR Code válido
+      html5QrcodeScanner.clear();
+      
+      document.getElementById("loadingScanner").style.display = "block";
+      document.getElementById("resultadoValida").classList.add("d-none");
+      document.getElementById("btnReset").classList.add("d-none");
+
+      // Chama a função de validação no Código.gs do Google Sheets
+      google.script.run
+        .withSuccessHandler(function(res) {
+          document.getElementById("loadingScanner").style.display = "none";
+          const resBox = document.getElementById("resultadoValida");
+          resBox.classList.remove("d-none");
+          document.getElementById("btnReset").classList.remove("d-none");
+
+          if (res.success) {
+            resBox.className = "result-box alert alert-success border-success text-dark text-start";
+            resBox.innerHTML = res.message;
+            // Efeito sonoro simples de aprovação (beep de sistema)
+            tocarSom(true);
+          } else {
+            resBox.className = "result-box alert alert-danger border-danger text-dark text-start";
+            resBox.innerHTML = res.message;
+            tocarSom(false);
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById("loadingScanner").style.display = "none";
+          const resBox = document.getElementById("resultadoValida");
+          resBox.classList.remove("d-none");
+          resBox.className = "result-box alert alert-warning border-warning";
+          resBox.innerHTML = "Erro ao conectar com o servidor: " + err.message;
+          document.getElementById("btnReset").classList.remove("d-none");
+        })
+        .validarQrCode(decodedText, senhaValidada);
+    }
+
+    function onScanFailure(error) {
+      // Tratamento silencioso para leituras parciais de frame
+    }
+
+    function reiniciarLeitor() {
+      document.getElementById("resultadoValida").classList.add("d-none");
+      document.getElementById("btnReset").classList.add("d-none");
+      inicializarScanner();
+    }
+
+    // Gerador de tom de áudio para dar feedback sem arquivos externos
+    function tocarSom(sucesso) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
         
-        const telaLogin = document.getElementById('tela-login');
-        const telaScanner = document.getElementById('tela-scanner');
-        const inputSenha = document.getElementById('input-senha');
-        const btnEntrar = document.getElementById('btn-entrar');
-        const btnSair = document.getElementById('btn-sair');
-        const msgErro = document.getElementById('msg-erro');
+        osc.connect(gain);
+        gain.connect(ctx.destination);
         
-        const divResultado = document.getElementById('resultado');
-        const modalResultado = document.getElementById('modal-resultado');
-        const modalTitulo = document.getElementById('modal-titulo');
-        const modalConteudo = document.getElementById('modal-conteudo');
-        const btnFecharModal = document.getElementById('btn-fechar-modal');
-        const btnOkModal = document.getElementById('btn-ok-modal');
-        
-        let html5QrcodeScanner = null;
-        let lastScannedCode = null;
-        let isScanning = false;
-        let senhaValidadaEmMemoria = ""; 
-
-        // === LÓGICA DE LOGIN ===
-        btnEntrar.addEventListener('click', logar);
-        inputSenha.addEventListener('keypress', (e) => { if (e.key === 'Enter') logar(); });
-
-        function logar() {
-            const senhaDigitada = inputSenha.value.trim();
-            if (!senhaDigitada) return;
-
-            btnEntrar.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 border-white border-t-2 border-b-2 rounded-full" viewBox="0 0 24 24"></svg> Validando...`;
-            btnEntrar.disabled = true;
-
-            const urlCompleta = `${URL_GOOGLE_SCRIPT}?action=login&senha=${encodeURIComponent(senhaDigitada)}`;
-
-            fetch(urlCompleta)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        senhaValidadaEmMemoria = senhaDigitada;
-                        telaLogin.classList.add('hidden');
-                        telaScanner.classList.remove('hidden');
-                        iniciarScanner();
-                    } else {
-                        msgErro.innerText = data.message || "Senha incorreta.";
-                        msgErro.classList.remove('hidden');
-                        setTimeout(() => msgErro.classList.add('hidden'), 3000);
-                    }
-                })
-                .catch(error => {
-                    msgErro.innerText = "Erro ao conectar.";
-                    msgErro.classList.remove('hidden');
-                    setTimeout(() => msgErro.classList.add('hidden'), 3000);
-                })
-                .finally(() => {
-                    btnEntrar.innerHTML = "Acessar Câmera"; btnEntrar.disabled = false; inputSenha.value = '';
-                });
+        if (sucesso) {
+          osc.frequency.setValueAtTime(880, ctx.currentTime); // Tom agudo rápido
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.15);
+        } else {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(150, ctx.currentTime); // Tom grave prolongado
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.45);
         }
-
-        btnSair.addEventListener('click', () => {
-            if (html5QrcodeScanner) html5QrcodeScanner.clear().catch(e => console.error(e));
-            senhaValidadaEmMemoria = ""; 
-            telaScanner.classList.add('hidden'); telaLogin.classList.remove('hidden');
-        });
-
-        // === LÓGICA DE FECHAR MODAL E RETOMAR SCANNER ===
-        function fecharModalERetomar() {
-            modalResultado.classList.add('hidden');
-            divResultado.innerHTML = "Aponte a câmera para o próximo QR Code...";
-            
-            // Libera as variáveis para permitir uma nova leitura
-            lastScannedCode = null; 
-            isScanning = false; 
-            
-            // Despausa a câmera
-            if(html5QrcodeScanner) html5QrcodeScanner.resume();
-        }
-
-        btnFecharModal.addEventListener('click', fecharModalERetomar);
-        btnOkModal.addEventListener('click', fecharModalERetomar);
-
-        // === LÓGICA DO SCANNER ===
-        function iniciarScanner() {
-            html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { 
-                fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0, showTorchButtonIfSupported: true
-            }, false);
-            html5QrcodeScanner.render(onScanSuccess, () => {});
-        }
-
-        function onScanSuccess(decodedText) {
-            // Evita leitura duplicada e bloqueia novas leituras enquanto processa
-            if (decodedText !== lastScannedCode && !isScanning) {
-                lastScannedCode = decodedText;
-                isScanning = true;
-                
-                // Pausa a câmera imediatamente
-                html5QrcodeScanner.pause(true);
-                divResultado.innerHTML = `<span class="text-blue-600 font-bold">Câmera pausada.</span>`;
-
-                // Abre o Modal em modo "Carregando"
-                modalTitulo.innerText = "Consultando Servidor";
-                modalConteudo.innerHTML = `
-                    <svg class="animate-spin h-12 w-12 text-orange-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="text-gray-600 font-bold text-lg">Aguarde...</p>
-                `;
-                modalResultado.classList.remove('hidden');
-
-                // Envia requisição para a Planilha
-                const urlCompleta = `${URL_GOOGLE_SCRIPT}?action=registrarEntrega&idUnico=${encodeURIComponent(decodedText)}&senha=${encodeURIComponent(senhaValidadaEmMemoria)}`;
-                
-                fetch(urlCompleta)
-                    .then(response => response.json())
-                    .then(data => {
-                        modalTitulo.innerText = "Resultado da Leitura";
-                        if (data.success) {
-                            modalConteudo.innerHTML = `
-                                <div class="text-green-500 mb-3">
-                                    <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                </div>
-                                <span class="text-green-700 font-black text-2xl block leading-tight">${data.message}</span>
-                            `;
-                        } else {
-                            modalConteudo.innerHTML = `
-                                <div class="text-red-500 mb-3">
-                                    <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                </div>
-                                <span class="text-red-600 font-bold block text-xl leading-tight">${data.message}</span>
-                            `;
-                        }
-                    })
-                    .catch(error => { 
-                        modalTitulo.innerText = "Erro de Conexão";
-                        modalConteudo.innerHTML = `
-                            <div class="text-red-500 mb-3">
-                                <svg class="w-20 h-20 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <span class="text-red-600 font-bold block text-xl">Não foi possível conectar ao servidor.</span>
-                        `; 
-                    });
-                
-                // O scanner não será retomado automaticamente. 
-                // A ação de retomada ocorrerá apenas quando o usuário clicar no "X" ou botão "Ler Próxima Ficha".
-            }
-        }
-    </script>
+      } catch (e) {}
+    }
+  </script>
 </body>
 </html>
