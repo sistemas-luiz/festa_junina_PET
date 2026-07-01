@@ -46,10 +46,9 @@
     <div id="modal-resultado" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 px-4">
         <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden transform transition-all">
             
-            <!-- Cabeçalho do Modal -->
-            <div class="bg-gray-100 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+            <!-- Cabeçalho do Modal (Sem botão de fechar X) -->
+            <div class="bg-gray-100 px-4 py-3 border-b border-gray-200 text-center">
                 <h3 class="text-lg font-black text-gray-800" id="modal-titulo">Processando...</h3>
-                <button id="btn-fechar-modal" class="text-gray-400 hover:text-red-600 text-3xl leading-none font-bold outline-none transition-colors">&times;</button>
             </div>
             
             <!-- Corpo do Modal -->
@@ -82,7 +81,6 @@
         const modalResultado = document.getElementById('modal-resultado');
         const modalTitulo = document.getElementById('modal-titulo');
         const modalConteudo = document.getElementById('modal-conteudo');
-        const btnFecharModal = document.getElementById('btn-fechar-modal');
         const btnOkModal = document.getElementById('btn-ok-modal');
         
         let html5QrcodeScanner = null;
@@ -133,7 +131,7 @@
             telaScanner.classList.add('hidden'); telaLogin.classList.remove('hidden');
         });
 
-        // === LÓGICA DE FECHAR MODAL E RETOMAR SCANNER ===
+        // === LÓGICA DE RETOMAR SCANNER ===
         function fecharModalERetomar() {
             modalResultado.classList.add('hidden');
             divResultado.innerHTML = "Aponte a câmera para o próximo QR Code...";
@@ -146,7 +144,6 @@
             if(html5QrcodeScanner) html5QrcodeScanner.resume();
         }
 
-        btnFecharModal.addEventListener('click', fecharModalERetomar);
         btnOkModal.addEventListener('click', fecharModalERetomar);
 
         // === LÓGICA DO SCANNER ===
@@ -166,6 +163,10 @@
                 // Pausa a câmera imediatamente
                 html5QrcodeScanner.pause(true);
                 divResultado.innerHTML = `<span class="text-blue-600 font-bold">Câmera pausada.</span>`;
+
+                // Bloqueia e estiliza o botão "Ler Próxima Ficha" durante o processamento
+                btnOkModal.disabled = true;
+                btnOkModal.classList.add('opacity-50', 'cursor-not-allowed');
 
                 // Abre o Modal em modo "Carregando"
                 modalTitulo.innerText = "Consultando Servidor";
@@ -209,10 +210,15 @@
                             </div>
                             <span class="text-red-600 font-bold block text-xl">Não foi possível conectar ao servidor.</span>
                         `; 
+                    })
+                    .finally(() => {
+                        // Reativa o botão de retomada após a resposta do servidor finalizar
+                        btnOkModal.disabled = false;
+                        btnOkModal.classList.remove('opacity-50', 'cursor-not-allowed');
                     });
                 
                 // O scanner não será retomado automaticamente. 
-                // A ação de retomada ocorrerá apenas quando o usuário clicar no "X" ou botão "Ler Próxima Ficha".
+                // A ação de retomada ocorrerá apenas quando o usuário clicar no botão "Ler Próxima Ficha".
             }
         }
     </script>
